@@ -4,6 +4,7 @@ nrf52-drv-gpio-example
 Description
 -----------
 This is a gpio driver example supporting the following features:
+
 - Configuring a pin or group of pins as input pin(s).
 - Configuring a pin or group of pins as output pin(s).
 - Getting the logical level an input pin or group of input pins.
