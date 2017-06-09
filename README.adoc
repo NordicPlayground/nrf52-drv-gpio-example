@@ -21,7 +21,7 @@ Requirements
 
 The project may need modifications to work with later versions or other boards. 
 
-To compile it, clone the repository in any subdirectory of the /nRF5_SDK_12.1.0/examples/ directory.
+To compile it, clone the repository in the /nRF5_SDK_12.1.0/examples/peripheral directory.
 
 About this project
 ------------------
