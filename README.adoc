@@ -1,5 +1,6 @@
 nrf52-drv-gpio-example
 ======================
+
 Description
 -----------
 This is a gpio driver example supporting the following features:
