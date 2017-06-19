@@ -34,7 +34,6 @@
 
 
 #ifdef DRV_GPIO_H__
-#define DRV_GPIO_H__
 
 
 #if DRV_GPIO_SENSE_NONE != GPIOTE_CONFIG_POLARITY_None
