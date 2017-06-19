@@ -34,6 +34,7 @@
 
 
 #include "drv_gpio.h"
+#include "drv_gpio_def_check.h"
 #include "nrf_error.h"
 
 #include <stdbool.h>
@@ -49,7 +50,7 @@ typedef struct
         DRV_GPIO_SENSE_Width   + 
         DRV_GPIO_HANDLER_Width
     );
-} m_drv_gpio_pin_state;
+} pin_state_t;
 
 
 static struct
@@ -59,101 +60,42 @@ static struct
         uint32_t    pin_msk;
         uint8_t     cnt;
     } gpiote;
-    m_drv_gpio_pin_state    gpio_states[DRV_GPIO_NR_OF_PINS];
+    pin_state_t             gpio_states[DRV_GPIO_NR_OF_PINS];
     drv_gpio_sig_handler_t  sig_handler;
 } m_drv_gpio = {.gpiote.cnt = 0, .gpiote.pin_msk = 0, .sig_handler = NULL};
 
 
-#if DRV_GPIO_SENSE_NONE != GPIOTE_CONFIG_POLARITY_None
-#error "ERROR: DRV_GPIO_SENSE_NONE != GPIOTE_CONFIG_POLARITY_None."
-#endif
-#if DRV_GPIO_SENSE_LOTOHI != GPIOTE_CONFIG_POLARITY_LoToHi
-#error "ERROR: DRV_GPIO_SENSE_LOTOHI != GPIOTE_CONFIG_POLARITY_LoToHi."
-#endif
-#if DRV_GPIO_SENSE_HITOLO != GPIOTE_CONFIG_POLARITY_HiToLo
-#error "ERROR: DRV_GPIO_SENSE_HITOLO != GPIOTE_CONFIG_POLARITY_HiToLo."
-#endif
-#if DRV_GPIO_SENSE_ANY != GPIOTE_CONFIG_POLARITY_Toggle
-#error "ERROR: DRV_GPIO_SENSE_ANY != GPIOTE_CONFIG_POLARITY_Toggle."
-#endif
-
-
-#if DRV_GPIO_PULL_NONE != GPIO_PIN_CNF_PULL_Disabled
-#error "ERROR: DRV_GPIO_PULL_NONE != GPIO_PIN_CNF_PULL_Disabled."
-#endif
-#if DRV_GPIO_PULL_UP != GPIO_PIN_CNF_PULL_Pullup
-#error "ERROR: DRV_GPIO_PULL_UP != GPIO_PIN_CNF_PULL_Pullup."
-#endif
-#if DRV_GPIO_PULL_DOWN != GPIO_PIN_CNF_PULL_Pulldown
-#error "ERROR: DRV_GPIO_PULL_DOWN != GPIO_PIN_CNF_PULL_Pulldown."
-#endif
-
-
-#if DRV_GPIO_LEVEL_LOW != GPIOTE_CONFIG_OUTINIT_Low
-#error "ERROR: DRV_GPIO_LEVEL_LOW != GPIOTE_CONFIG_OUTINIT_Low."
-#endif
-#if DRV_GPIO_LEVEL_HIGH != GPIOTE_CONFIG_OUTINIT_High
-#error "ERROR: DRV_GPIO_LEVEL_HIGH != GPIOTE_CONFIG_OUTINIT_High."
-#endif
-
-
-#if DRV_GPIO_DRIVE_S0S1 != GPIO_PIN_CNF_DRIVE_S0S1
-#error "ERROR: DRV_GPIO_DRIVE_S0S1 != GPIO_PIN_CNF_DRIVE_S0S1."
-#endif
-#if DRV_GPIO_DRIVE_H0S1 != GPIO_PIN_CNF_DRIVE_H0S1
-#error "ERROR: DRV_GPIO_DRIVE_H0S1 != GPIO_PIN_CNF_DRIVE_H0S1."
-#endif
-#if DRV_GPIO_DRIVE_S0H1 != GPIO_PIN_CNF_DRIVE_S0H1
-#error "ERROR: DRV_GPIO_DRIVE_S0H1 != GPIO_PIN_CNF_DRIVE_S0H1."
-#endif
-#if DRV_GPIO_DRIVE_H0H1 != GPIO_PIN_CNF_DRIVE_H0H1
-#error "ERROR: DRV_GPIO_DRIVE_H0H1 != GPIO_PIN_CNF_DRIVE_H0H1."
-#endif
-#if DRV_GPIO_DRIVE_D0S1 != GPIO_PIN_CNF_DRIVE_D0S1
-#error "ERROR: DRV_GPIO_DRIVE_D0S1 != GPIO_PIN_CNF_DRIVE_D0S1."
-#endif
-#if DRV_GPIO_DRIVE_D0H1 != GPIO_PIN_CNF_DRIVE_D0H1
-#error "ERROR: DRV_GPIO_DRIVE_D0H1 != GPIO_PIN_CNF_DRIVE_D0H1."
-#endif
-#if DRV_GPIO_DRIVE_S0D1 != GPIO_PIN_CNF_DRIVE_S0D1
-#error "ERROR: DRV_GPIO_DRIVE_S0D1 != GPIO_PIN_CNF_DRIVE_S0D1."
-#endif
-#if DRV_GPIO_DRIVE_H0D1 != GPIO_PIN_CNF_DRIVE_H0D1
-#error "ERROR: DRV_GPIO_DRIVE_H0D1 != GPIO_PIN_CNF_DRIVE_H0D1."
-#endif
-
-
-static __INLINE bool m_gpiote_pin_add(uint8_t pin)
+static __INLINE bool gpiote_pin_add(uint8_t pin)
 {
-    if ( ((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) == 0)
-    &&   (m_drv_gpio.gpiote.cnt                       < DRV_GPIO_NR_OF_GPIOTE_INSTANCES) )
+    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) == 0)
+    &&   (m_drv_gpio.gpiote.cnt                     <  DRV_GPIO_NR_OF_GPIOTE_INSTANCES))
     {
-        for ( uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++ )
+        for (uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
         {
-            if ( ((NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_MODE_Msk) >> GPIOTE_CONFIG_MODE_Pos) == GPIOTE_CONFIG_MODE_Disabled )
+            if (((NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_MODE_Msk) >> GPIOTE_CONFIG_MODE_Pos) == GPIOTE_CONFIG_MODE_Disabled)
             {
                 NRF_GPIOTE->CONFIG[i] = (NRF_GPIOTE->CONFIG[i] & ~GPIOTE_CONFIG_PSEL_Msk) | (pin << GPIOTE_CONFIG_PSEL_Pos);
                 
                 m_drv_gpio.gpiote.pin_msk |= (1UL << pin);
                 ++m_drv_gpio.gpiote.cnt;
                 
-                return ( true );
+                return true;
             }
         }
     }
     
-    return ( false );
+    return false;
 }
 
 
-static __INLINE bool m_gpiote_pin_remove(uint8_t pin)
+static __INLINE bool gpiote_pin_remove(uint8_t pin)
 {
-    if ( ((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) != 0 )
-    &&   (m_drv_gpio.gpiote.cnt                      >  0) )
+    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) != 0)
+    &&   (m_drv_gpio.gpiote.cnt                     >  0))
     {
-        for ( uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++ )
+        for (uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
         {
-            if ( ((NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_MODE_Msk) >> GPIOTE_CONFIG_MODE_Pos) != GPIOTE_CONFIG_MODE_Disabled )
+            if (((NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_MODE_Msk) >> GPIOTE_CONFIG_MODE_Pos) != GPIOTE_CONFIG_MODE_Disabled)
             {
                 NRF_GPIOTE->INTENCLR = GPIOTE_INTENCLR_IN0_Clear << (GPIOTE_INTENCLR_IN0_Pos + i);
                 
@@ -162,29 +104,73 @@ static __INLINE bool m_gpiote_pin_remove(uint8_t pin)
                 m_drv_gpio.gpiote.pin_msk &= ~(1UL << pin);
                 --m_drv_gpio.gpiote.cnt;
                 
-                return ( true );
+                return true;
             }
         }
     }
     
-    return ( false );
+    return false;
 }
 
 
-static __INLINE uint8_t m_gpiote_idx_get(uint8_t pin)
+static __INLINE uint8_t gpiote_idx_get(uint8_t pin)
 {
     uint8_t i;
     
-    for ( i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++ )
+    for (i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
     {
-        if ( (((NRF_GPIOTE->CONFIG[i]    & GPIOTE_CONFIG_PSEL_Msk) >> GPIOTE_CONFIG_PSEL_Pos) == pin)
-        &&   ((m_drv_gpio.gpiote.pin_msk & (1UL << pin))                                      != 0) )
+        if ((((NRF_GPIOTE->CONFIG[i]    & GPIOTE_CONFIG_PSEL_Msk) >> GPIOTE_CONFIG_PSEL_Pos) == pin)
+        &&  ((m_drv_gpio.gpiote.pin_msk & (1UL << pin))                                      != 0))
         {
-            return ( i );
+            return i;
         }
     }
     
-    return ( i );
+    return i;
+}
+
+
+static __INLINE void gpiote_intenset(uint32_t inten_msk)
+{
+    if (NRF_GPIOTE->INTENSET == 0)
+    {
+        NVIC_EnableIRQ(GPIOTE_IRQn);
+    }
+    
+    NRF_GPIOTE->INTENSET = inten_msk;
+}
+
+
+static void gpiote_outport_modify(uint32_t high_msk, uint32_t low_msk)
+{
+    uint32_t high_msk_gpiote = high_msk        & m_drv_gpio.gpiote.pin_msk;
+    uint32_t low_msk_gpiote  = low_msk         & m_drv_gpio.gpiote.pin_msk;
+    uint32_t tmp_u32         = high_msk_gpiote | low_msk_gpiote;
+    
+    if ((high_msk_gpiote & low_msk_gpiote) == 0)
+    {
+        uint8_t  i = 0;
+        
+        while (tmp_u32 > 0)
+        {
+            if ((tmp_u32 & 1) != 0)
+            {
+                uint8_t idx = gpiote_idx_get(i);
+                
+                if ((high_msk_gpiote & (1UL << i)) != 0)
+                {
+                    NRF_GPIOTE->TASKS_SET[idx] = 1;
+                }
+                if ((low_msk_gpiote & (1UL << i)) != 0)
+                {
+                    NRF_GPIOTE->TASKS_CLR[idx] = 1;
+                }
+            }
+            
+            tmp_u32 >>= 1;
+            ++i;
+        }
+    }
 }
 
 
@@ -196,16 +182,16 @@ void drv_gpio_sig_handler_set(drv_gpio_sig_handler_t sig_handler)
 
 uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p_event)
 {   
-    if ( pin >= DRV_GPIO_NR_OF_PINS )
+    if (pin >= DRV_GPIO_NR_OF_PINS)
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
     
-    if ( cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE )
+    if (cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE)
     {
-        if ( m_gpiote_pin_add(pin) )
+        if (gpiote_pin_add(pin))
         {
-            uint8_t const idx = m_gpiote_idx_get(pin);
+            uint8_t const idx = gpiote_idx_get(pin);
 
             m_drv_gpio.gpio_states[pin].handler_enable = cfg.handler;
             
@@ -223,26 +209,26 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
                 (cfg.sense                  << GPIOTE_CONFIG_POLARITY_Pos)
             );
 
-            if ( p_event != NULL )
+            if (p_event != NULL)
             {
                 *p_event = (uint32_t *)&(NRF_GPIOTE->EVENTS_IN[idx]);
             }
             
-            if ( cfg.handler == DRV_GPIO_HANDLER_ENABLE )
+            if (cfg.handler == DRV_GPIO_HANDLER_ENABLE)
             {
-                NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Set << (GPIOTE_INTENSET_IN0_Pos + idx);
+                gpiote_intenset(GPIOTE_INTENSET_IN0_Set << (GPIOTE_INTENSET_IN0_Pos + idx));
             }
         }
         else
         {
-            return ( NRF_ERROR_NOT_FOUND );
+            return NRF_ERROR_NOT_FOUND;
         }
     }
     else
     {
-       (void)m_gpiote_pin_remove(pin);
+       (void)gpiote_pin_remove(pin);
         
-        m_drv_gpio.gpio_states[pin].current_sense = cfg.sense;
+        m_drv_gpio.gpio_states[pin].current_sense  = cfg.sense;
         m_drv_gpio.gpio_states[pin].handler_enable = cfg.handler;
         
         NRF_GPIO->PIN_CNF[pin] =
@@ -252,7 +238,7 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
             (cfg.pull                   << GPIO_PIN_CNF_PULL_Pos)
         );
 
-        if ( cfg.sense != DRV_GPIO_SENSE_NONE )
+        if (cfg.sense != DRV_GPIO_SENSE_NONE)
         {
             uint8_t level;
             
@@ -262,13 +248,13 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
             }
             else
             {
-                level = ( cfg.pull == DRV_GPIO_PULL_UP ) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW;
+                level = (cfg.pull == DRV_GPIO_PULL_UP) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW;
             }
             
             NRF_GPIO->DETECTMODE = GPIO_DETECTMODE_DETECTMODE_LDETECT << GPIO_DETECTMODE_DETECTMODE_Pos;
             NRF_GPIO->LATCH = (1UL << pin);
             
-            if ( level == DRV_GPIO_LEVEL_LOW )
+            if (level == DRV_GPIO_LEVEL_LOW)
             {
                 NRF_GPIO->PIN_CNF[pin] |= GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos;
             }
@@ -277,14 +263,14 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
                 NRF_GPIO->PIN_CNF[pin] |= GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos;
             }
             
-            if ( cfg.handler == DRV_GPIO_HANDLER_ENABLE )
+            if (cfg.handler == DRV_GPIO_HANDLER_ENABLE)
             {
-                NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_PORT_Set << GPIOTE_INTENSET_PORT_Pos;
+                gpiote_intenset(GPIOTE_INTENSET_PORT_Set << GPIOTE_INTENSET_PORT_Pos);
             }
         }
     }
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
@@ -294,15 +280,15 @@ uint32_t drv_gpio_inpins_cfg(uint32_t pin_msk, drv_gpio_inpin_cfg_t cfg, uint32_
     uint8_t  i          = 0;
     uint8_t  n          = 0;
     
-    while ( tmp_u32 > 0 )
+    while (tmp_u32 > 0)
     {
-        if ( (tmp_u32 & 1) != 0 )
+        if ((tmp_u32 & 1) != 0)
         {
-            uint32_t ret_val = ( p_event_arr == NULL ) ? drv_gpio_inpin_cfg(i, cfg, NULL) : drv_gpio_inpin_cfg(i, cfg, &(p_event_arr[n]));
+            uint32_t ret_val = (p_event_arr == NULL) ? drv_gpio_inpin_cfg(i, cfg, NULL) : drv_gpio_inpin_cfg(i, cfg, &(p_event_arr[n]));
                 
-            if ( ret_val != NRF_SUCCESS )
+            if (ret_val != NRF_SUCCESS)
             {
-                return ( ret_val );
+                return ret_val;
             }
             ++n;
         }
@@ -311,22 +297,22 @@ uint32_t drv_gpio_inpins_cfg(uint32_t pin_msk, drv_gpio_inpin_cfg_t cfg, uint32_
         ++i;
     }
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t ** p_task)
 {
-    if ( pin >= DRV_GPIO_NR_OF_PINS )
+    if (pin >= DRV_GPIO_NR_OF_PINS)
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
 
-    if ( cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE )
+    if (cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE)
     {
-        if ( m_gpiote_pin_add(pin) )
+        if (gpiote_pin_add(pin))
         {
-            uint8_t     const   idx     = m_gpiote_idx_get(pin);
+            uint8_t     const   idx     = gpiote_idx_get(pin);
             uint32_t            config  = 
             (
                 (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos) |
@@ -334,11 +320,11 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
                 (cfg.level               << GPIOTE_CONFIG_OUTINIT_Pos)
             );
             
-            if ( p_task != NULL )
+            if (p_task != NULL)
             {
                 uint32_t *p_task_addr;
 
-                switch ( cfg.task )
+                switch (cfg.task)
                 {
                     case DRV_GPIO_TASK_CLEAR:
                         p_task_addr = (uint32_t *)&(NRF_GPIOTE->TASKS_CLR[idx]);
@@ -359,12 +345,12 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
         }
         else
         {
-            return ( NRF_ERROR_NOT_FOUND );
+            return NRF_ERROR_NOT_FOUND;
         }
     }
     else
     {
-       (void)m_gpiote_pin_remove(pin);
+       (void)gpiote_pin_remove(pin);
         
         NRF_GPIO->PIN_CNF[pin] =
         (
@@ -373,7 +359,7 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
         );
     }
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
@@ -383,15 +369,15 @@ uint32_t drv_gpio_outpins_cfg(uint32_t pin_msk, drv_gpio_outpin_cfg_t cfg, uint3
     uint8_t  i = 0;
     uint8_t  n = 0;
     
-    while ( tmp_u32 > 0 )
+    while (tmp_u32 > 0)
     {
-        if ( (tmp_u32 & 1) != 0 )
+        if ((tmp_u32 & 1) != 0)
         {
-            uint32_t ret_val = ( p_task_arr == NULL ) ? drv_gpio_outpin_cfg(i, cfg, NULL) : drv_gpio_outpin_cfg(i, cfg, &(p_task_arr[n]));
+            uint32_t ret_val = (p_task_arr == NULL) ? drv_gpio_outpin_cfg(i, cfg, NULL) : drv_gpio_outpin_cfg(i, cfg, &(p_task_arr[n]));
                 
-            if ( ret_val != NRF_SUCCESS )
+            if (ret_val != NRF_SUCCESS)
             {
-                return ( ret_val );
+                return ret_val;
             }
             ++n;
         }
@@ -400,18 +386,18 @@ uint32_t drv_gpio_outpins_cfg(uint32_t pin_msk, drv_gpio_outpin_cfg_t cfg, uint3
         ++i;
     }
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 uint32_t drv_gpio_pin_disconnect(uint8_t pin)
 {
-    if ( pin >= DRV_GPIO_NR_OF_PINS )
+    if (pin >= DRV_GPIO_NR_OF_PINS)
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
     
-   (void)m_gpiote_pin_remove(pin);
+   (void)gpiote_pin_remove(pin);
     
     NRF_GPIO->PIN_CNF[pin] =
     (
@@ -419,7 +405,7 @@ uint32_t drv_gpio_pin_disconnect(uint8_t pin)
         (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
     );
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
@@ -428,14 +414,14 @@ uint32_t drv_gpio_pins_disconnect(uint32_t pin_msk)
     uint32_t tmp_u32 = pin_msk;
     uint8_t  i       = 0;
     
-    if ( pin_msk == 0 )
+    if (pin_msk == 0)
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
     
-    while ( tmp_u32 > 0 )
+    while (tmp_u32 > 0)
     {
-        if ( (tmp_u32 & 1) != 0 )
+        if ((tmp_u32 & 1) != 0)
         {
             (void)drv_gpio_pin_disconnect(i);
         }
@@ -444,60 +430,27 @@ uint32_t drv_gpio_pins_disconnect(uint32_t pin_msk)
         ++i;
     }
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 uint32_t drv_gpio_inpin_get(uint8_t pin, uint8_t *p_level)
 {
-    if ( (pin     >= DRV_GPIO_NR_OF_PINS)
-    &&   (p_level == NULL) )
+    if ((pin     >= DRV_GPIO_NR_OF_PINS)
+    &&  (p_level == NULL))
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
 
-    *p_level = ( (NRF_GPIO->IN & (1UL << pin)) != 0 ) ? 1 : 0;
+    *p_level = ((NRF_GPIO->IN & (1UL << pin)) != 0) ? 1 : 0;
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 uint32_t drv_gpio_inport_get(void)
 {
-    return ( NRF_GPIO->IN );
-}
-
-
-static void m_gpiote_outport_modify(uint32_t high_msk, uint32_t low_msk)
-{
-    uint32_t high_msk_gpiote = high_msk        & m_drv_gpio.gpiote.pin_msk;
-    uint32_t low_msk_gpiote  = low_msk         & m_drv_gpio.gpiote.pin_msk;
-    uint32_t tmp_u32         = high_msk_gpiote | low_msk_gpiote;
-    
-    if ( (high_msk_gpiote & low_msk_gpiote) == 0 )
-    {
-        uint8_t  i = 0;
-        
-        while ( tmp_u32 > 0 )
-        {
-            if ( (tmp_u32 & 1) != 0 )
-            {
-                uint8_t idx = m_gpiote_idx_get(i);
-                
-                if ( (high_msk_gpiote & (1UL << i)) != 0 )
-                {
-                    NRF_GPIOTE->TASKS_SET[idx] = 1;
-                }
-                if ( (low_msk_gpiote & (1UL << i)) != 0 )
-                {
-                    NRF_GPIOTE->TASKS_CLR[idx] = 1;
-                }
-            }
-            
-            tmp_u32 >>= 1;
-            ++i;
-        }
-    }
+    return NRF_GPIO->IN;
 }
 
 
@@ -505,26 +458,26 @@ uint32_t drv_gpio_outpin_level_set(uint8_t pin, uint8_t level)
 {
     uint32_t const pin_msk = (1UL << pin);
     
-    if ( (pin   >= DRV_GPIO_NR_OF_PINS)
-    &&   (level >  DRV_GPIO_LEVEL_HIGH) )
+    if ((pin   >= DRV_GPIO_NR_OF_PINS)
+    ||  (level >  DRV_GPIO_LEVEL_HIGH))
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
     
-    if ( (pin_msk & m_drv_gpio.gpiote.pin_msk) != 0 )
+    if ((pin_msk & m_drv_gpio.gpiote.pin_msk) != 0)
     {
-        if ( level == DRV_GPIO_LEVEL_LOW )
+        if (level == DRV_GPIO_LEVEL_LOW)
         {
-            m_gpiote_outport_modify(0, pin_msk);
+            gpiote_outport_modify(0, pin_msk);
         }
         else
         {
-            m_gpiote_outport_modify(pin_msk, 0);
+            gpiote_outport_modify(pin_msk, 0);
         }
     }
     else
     {
-        if ( level == DRV_GPIO_LEVEL_LOW )
+        if (level == DRV_GPIO_LEVEL_LOW)
         {
             NRF_GPIO->OUTCLR = pin_msk;
         }
@@ -534,29 +487,29 @@ uint32_t drv_gpio_outpin_level_set(uint8_t pin, uint8_t level)
         }
     }
 
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 uint32_t drv_gpio_outport_modify(uint32_t high_msk, uint32_t low_msk)
 {
-    if ( (high_msk & low_msk) != 0 )
+    if ((high_msk & low_msk) != 0)
     {
-        return ( NRF_ERROR_INVALID_PARAM );
+        return NRF_ERROR_INVALID_PARAM;
     }
     
-    m_gpiote_outport_modify(high_msk, low_msk);
+    gpiote_outport_modify(high_msk, low_msk);
     
     NRF_GPIO->OUTSET = high_msk & ~m_drv_gpio.gpiote.pin_msk;
     NRF_GPIO->OUTCLR = low_msk  & ~m_drv_gpio.gpiote.pin_msk;
     
-    return ( NRF_SUCCESS );
+    return NRF_SUCCESS;
 }
 
 
 void drv_gpio_outport_toggle(uint32_t toggle_msk)
 {
-    if ( toggle_msk != 0 )
+    if (toggle_msk != 0)
     {
         uint32_t set_bits = (toggle_msk ^ NRF_GPIO->IN) & toggle_msk;
         uint32_t clr_bits = ~set_bits & toggle_msk;
@@ -566,12 +519,12 @@ void drv_gpio_outport_toggle(uint32_t toggle_msk)
         uint32_t clr_bits_gpiote = clr_bits &  m_drv_gpio.gpiote.pin_msk;
         
         
-        if ( (set_bits_gpiote | clr_bits_gpiote ) != 0 )
+        if ((set_bits_gpiote | clr_bits_gpiote) != 0)
         {
-            m_gpiote_outport_modify(set_bits_gpiote, clr_bits_gpiote);
+            gpiote_outport_modify(set_bits_gpiote, clr_bits_gpiote);
         }
 
-        if ( (set_bits_gpio | clr_bits_gpio ) != 0 )
+        if ((set_bits_gpio | clr_bits_gpio) != 0)
         {
             NRF_GPIO->OUTSET = set_bits_gpio;
             NRF_GPIO->OUTCLR = clr_bits_gpio;
@@ -582,7 +535,7 @@ void drv_gpio_outport_toggle(uint32_t toggle_msk)
 
 void drv_gpio_outport_set(uint32_t outport)
 {
-    if ( m_drv_gpio.gpiote.pin_msk == 0 )
+    if (m_drv_gpio.gpiote.pin_msk == 0)
     {
         NRF_GPIO->OUT = outport;
     }
@@ -595,8 +548,8 @@ void drv_gpio_outport_set(uint32_t outport)
 
 static void m_pin_event_report(uint8_t pin, uint8_t sense_edge)
 {
-    if ( (m_drv_gpio.gpio_states[pin].handler_enable == DRV_GPIO_HANDLER_ENABLE)
-    &&   (m_drv_gpio.sig_handler                     != NULL) )
+    if ((m_drv_gpio.gpio_states[pin].handler_enable == DRV_GPIO_HANDLER_ENABLE)
+    &&  (m_drv_gpio.sig_handler                     != NULL))
     {
         m_drv_gpio.sig_handler(pin, sense_edge);
     }
@@ -605,10 +558,10 @@ static void m_pin_event_report(uint8_t pin, uint8_t sense_edge)
 
 void GPIOTE_IRQHandler(void)
 {
-    for ( uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; ++i )
+    for (uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; ++i)
     {
-        if ( (NRF_GPIOTE->EVENTS_IN[i]                                                            != 0) 
-        &&   ((NRF_GPIOTE->INTENSET & (GPIOTE_INTENSET_IN0_Set << (GPIOTE_INTENSET_IN0_Pos + i))) != 0) )
+        if ((NRF_GPIOTE->EVENTS_IN[i]                                                            != 0) 
+        &&  ((NRF_GPIOTE->INTENSET & (GPIOTE_INTENSET_IN0_Set << (GPIOTE_INTENSET_IN0_Pos + i))) != 0))
         {
             uint8_t const pin           = (NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_PSEL_Msk)     >> GPIOTE_CONFIG_PSEL_Pos;
             uint8_t const sensed_edge   = (NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_POLARITY_Msk) >> GPIOTE_CONFIG_POLARITY_Pos;
@@ -620,19 +573,19 @@ void GPIOTE_IRQHandler(void)
         }
     }
     
-    while ( NRF_GPIOTE->EVENTS_PORT != 0 )
+    while (NRF_GPIOTE->EVENTS_PORT != 0)
     {
-        for ( uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_PINS; ++i )
+        for (uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_PINS; ++i)
         {
-            if ( (m_drv_gpio.gpio_states[i].current_sense != DRV_GPIO_SENSE_NONE)
-            &&   ((NRF_GPIO->LATCH & (1UL << i))          != 0) )
+            if ((m_drv_gpio.gpio_states[i].current_sense != DRV_GPIO_SENSE_NONE)
+            &&  ((NRF_GPIO->LATCH & (1UL << i))          != 0))
             {
                 uint8_t const sense_level_at_entry = (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_High) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW; 
                 uint8_t const current_pin_sense    = m_drv_gpio.gpio_states[i].current_sense;
                 
                 do
                 {
-                    if ( ((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_Low )
+                    if (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_Low)
                     {
                         NRF_GPIO->PIN_CNF[i] = (NRF_GPIO->PIN_CNF[i] & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
                     }
@@ -643,22 +596,20 @@ void GPIOTE_IRQHandler(void)
                     NRF_GPIO->LATCH = 1UL << i;
                     (void)NRF_GPIO->LATCH;
                 }
-                while ( (NRF_GPIO->LATCH & (1UL << i)) != 0 );
+                while ((NRF_GPIO->LATCH & (1UL << i)) != 0);
              
                 NRF_GPIOTE->EVENTS_PORT = 0;
                (void)NRF_GPIOTE->EVENTS_PORT;
                 
-                if ( ( (current_pin_sense == DRV_GPIO_SENSE_LOTOHI)
-                  ||   (current_pin_sense == DRV_GPIO_SENSE_ANY)
-                     )
-                &&   (sense_level_at_entry == DRV_GPIO_LEVEL_HIGH) )
+                if (((current_pin_sense == DRV_GPIO_SENSE_LOTOHI) ||
+                     (current_pin_sense == DRV_GPIO_SENSE_ANY))
+                &&  (sense_level_at_entry == DRV_GPIO_LEVEL_HIGH))
                 {
                     m_pin_event_report(i, DRV_GPIO_SENSE_LOTOHI);
                 }
-                else if ( ( (current_pin_sense == DRV_GPIO_SENSE_HITOLO)
-                       ||   (current_pin_sense == DRV_GPIO_SENSE_ANY)
-                          )
-                &&        (sense_level_at_entry == DRV_GPIO_LEVEL_LOW) )
+                else if (((current_pin_sense == DRV_GPIO_SENSE_HITOLO) ||
+                          (current_pin_sense == DRV_GPIO_SENSE_ANY))
+                &&        (sense_level_at_entry == DRV_GPIO_LEVEL_LOW))
                 {
                     m_pin_event_report(i, DRV_GPIO_SENSE_HITOLO);
                 }
