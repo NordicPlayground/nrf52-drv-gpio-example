@@ -51,7 +51,7 @@
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>1</CreateHexFile>
-          <DebugInformation>1</DebugInformation>
+          <DebugInformation>0</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\build\</ListingPath>
           <HexFormatSelection>1</HexFormatSelection>
@@ -406,28 +406,24 @@
       </TargetOption>
       <Groups>
         <Group>
-          <GroupName>app</GroupName>
+          <GroupName>Example</GroupName>
           <Files>
             <File>
               <FileName>drv_gpio_example.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\drv_gpio_example.c</FilePath>
             </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Driver</GroupName>
+          <Files>
             <File>
               <FileName>drv_gpio.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\drv_gpio\drv_gpio.c</FilePath>
             </File>
           </Files>
-        </Group>
-        <Group>
-          <GroupName>core</GroupName>
-        </Group>
-        <Group>
-          <GroupName>mut</GroupName>
-        </Group>
-        <Group>
-          <GroupName>libs</GroupName>
         </Group>
         <Group>
           <GroupName>::CMSIS</GroupName>
