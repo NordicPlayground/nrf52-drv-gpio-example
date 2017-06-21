@@ -14,14 +14,31 @@ This is a gpio driver example supporting the following features:
 - Toggling of pin(s) without involving the CPU.
 - Disconnecting a pin or group of pins.
 
+Follow these steps to run the example:
+
+. Extract the 12.3.0 version of the SDK.
+. Enter the nRF5_SDK_12.3.0_d7731ad\examples\peripheral directory.
+. Clone the repo: git clone https://github.com/NordicSemiconductor/nrf52-drv-gpio-example.git
+. Enter the nRF5_SDK_12.3.0_d7731ad\examples\peripheral\nrf52-drv-gpio-example\pca10040\arm5_no_packs directory
+. Open the drv_gpio_example.uvprojx Keil project file.
+. Build the project.
+. Select and configure the debugger.
+. Press the LOAD button.
+. All four LEDs should now blink 4 times.
+. Press one button at a time to observe the behavior of the example.
+. Press all four buttons simultaneously to proceed to the next example.
+. Repeat from step 9 until the board does not respond to button presses anymore, which means the program has run to the end.
+
+NOTE: Power-cycle the board to run all examples again.
+
 Requirements
 ------------
-- nRF5 SDK version 12.1.0
+- nRF5 SDK version 12.3.0
 - nRF52DK
 
 The project may need modifications to work with later versions or other boards. 
 
-To compile it, clone the repository in the /nRF5_SDK_12.1.0/examples/peripheral directory.
+To compile it, clone the repository in the /nRF5_SDK_12.3.0/examples/peripheral directory.
 
 About this project
 ------------------
