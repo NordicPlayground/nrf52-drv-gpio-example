@@ -363,7 +363,7 @@
             <useXO>0</useXO>
             <VariousControls>
               <MiscControls>--c99</MiscControls>
-              <Define>GLOBAL_TWI_INSTANCE_IDX=0 GLOBAL_TWIS_INSTANCE_IDX=1</Define>
+              <Define>NRF52832</Define>
               <Undefine></Undefine>
               <IncludePath>..\..\drv_gpio;..\..\..\..\..\components\boards;..\..\..\..\..\components\drivers_nrf\nrf_soc_nosd;..\..\..\..\..\components\drivers_nrf\hal;..\..\..\..\..\components\drivers_nrf\delay;..\..\..\..\..\components\libraries\util;..\..\..\..\..\config</IncludePath>
             </VariousControls>
