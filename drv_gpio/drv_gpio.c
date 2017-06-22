@@ -40,6 +40,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+
+#define M_NO_PIN_MSK        (0)
+
+
 typedef struct
 {
     uint8_t current_sense  : DRV_GPIO_SENSE_Width;
@@ -62,21 +66,27 @@ static struct
     } gpiote;
     pin_state_t             gpio_states[DRV_GPIO_NR_OF_PINS];
     drv_gpio_sig_handler_t  sig_handler;
-} m_drv_gpio = {.gpiote.cnt = 0, .gpiote.pin_msk = 0, .sig_handler = NULL};
+} m_drv_gpio = {.gpiote.cnt = 0, .gpiote.pin_msk = 0, .sig_handler = DRV_GPIO_NO_SIG_HANDLER};
 
 
-static __INLINE bool gpiote_pin_add(uint8_t pin)
+/**@brief Acquires  a GPIOTE instance for the specified pin.
+ *
+ * @param pin_no    The pin number of the pin to acquire an instance for.
+ *
+ * @retval true     If there was a vacant GPIOTE instance to acquire.
+ * @retval false    If there was no vacant GPIOTE instance available. */
+static __INLINE bool gpiote_pin_acquire(uint8_t pin_no)
 {
-    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) == 0)
-    &&   (m_drv_gpio.gpiote.cnt                     <  DRV_GPIO_NR_OF_GPIOTE_INSTANCES))
+    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin_no)) == 0)
+    &&   (m_drv_gpio.gpiote.cnt                        <  DRV_GPIO_NR_OF_GPIOTE_INSTANCES))
     {
         for (uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
         {
             if (((NRF_GPIOTE->CONFIG[i] & GPIOTE_CONFIG_MODE_Msk) >> GPIOTE_CONFIG_MODE_Pos) == GPIOTE_CONFIG_MODE_Disabled)
             {
-                NRF_GPIOTE->CONFIG[i] = (NRF_GPIOTE->CONFIG[i] & ~GPIOTE_CONFIG_PSEL_Msk) | (pin << GPIOTE_CONFIG_PSEL_Pos);
+                NRF_GPIOTE->CONFIG[i] = (NRF_GPIOTE->CONFIG[i] & ~GPIOTE_CONFIG_PSEL_Msk) | (pin_no << GPIOTE_CONFIG_PSEL_Pos);
                 
-                m_drv_gpio.gpiote.pin_msk |= (1UL << pin);
+                m_drv_gpio.gpiote.pin_msk |= (1UL << pin_no);
                 ++m_drv_gpio.gpiote.cnt;
                 
                 return true;
@@ -88,9 +98,15 @@ static __INLINE bool gpiote_pin_add(uint8_t pin)
 }
 
 
-static __INLINE bool gpiote_pin_remove(uint8_t pin)
+/**@brief Releases the GPIOTE instance associated with the specified pin.
+ *
+ * @param pin_no    The pin number of the pin to release the instance for.
+ *
+ * @retval true     If there was a GPIOTE instance associated with the specified pin.
+ * @retval false    If there was no GPIOTE instance associated with the specified pin. */
+static __INLINE bool gpiote_pin_release(uint8_t pin_no)
 {
-    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin)) != 0)
+    if (((m_drv_gpio.gpiote.pin_msk & (1UL << pin_no)) != 0)
     &&   (m_drv_gpio.gpiote.cnt                     >  0))
     {
         for (uint8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
@@ -101,7 +117,7 @@ static __INLINE bool gpiote_pin_remove(uint8_t pin)
                 
                 NRF_GPIOTE->CONFIG[i] = (NRF_GPIOTE->CONFIG[i] & ~GPIOTE_CONFIG_MODE_Msk) | (GPIOTE_CONFIG_MODE_Disabled << GPIOTE_CONFIG_MODE_Pos);
                 
-                m_drv_gpio.gpiote.pin_msk &= ~(1UL << pin);
+                m_drv_gpio.gpiote.pin_msk &= ~(1UL << pin_no);
                 --m_drv_gpio.gpiote.cnt;
                 
                 return true;
@@ -113,14 +129,20 @@ static __INLINE bool gpiote_pin_remove(uint8_t pin)
 }
 
 
-static __INLINE uint8_t gpiote_idx_get(uint8_t pin)
+/**@brief Gets the index of the GPIOTE instance associated with the specified pin.
+ *
+ * @param pin_no    The pin number of the pin to get the instance index for.
+ *
+ * @return  The index of the GPIOTE instance associated with the specified pin, or
+ *          DRV_GPIO_NR_OF_GPIOTE_INSTANCES if there was no GPIOTE instance associated with the specified pin. */
+static __INLINE uint8_t gpiote_instance_idx_get(uint8_t pin_no)
 {
     uint8_t i;
     
     for (i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; i++)
     {
-        if ((((NRF_GPIOTE->CONFIG[i]    & GPIOTE_CONFIG_PSEL_Msk) >> GPIOTE_CONFIG_PSEL_Pos) == pin)
-        &&  ((m_drv_gpio.gpiote.pin_msk & (1UL << pin))                                      != 0))
+        if ((((NRF_GPIOTE->CONFIG[i]    & GPIOTE_CONFIG_PSEL_Msk) >> GPIOTE_CONFIG_PSEL_Pos) == pin_no)
+        &&  ((m_drv_gpio.gpiote.pin_msk & (1UL << pin_no))                                   != 0))
         {
             return i;
         }
@@ -130,6 +152,9 @@ static __INLINE uint8_t gpiote_idx_get(uint8_t pin)
 }
 
 
+/**@brief Enables the interrupt(s) specified by the mask.
+ *
+ * @param inten_msk The mask specifying what interrupts to be enabled. */
 static __INLINE void gpiote_intenset(uint32_t inten_msk)
 {
     if (NRF_GPIOTE->INTENSET == 0)
@@ -141,6 +166,10 @@ static __INLINE void gpiote_intenset(uint32_t inten_msk)
 }
 
 
+/**@brief Modifies the specified logical levels of the specified GPIOTE pins.
+ *
+ * @param   high_msk        The pins to be set to logical high value.
+ * @param   low_msk         The pins to be cleared to logical low value. */
 static void gpiote_outport_modify(uint32_t high_msk, uint32_t low_msk)
 {
     uint32_t high_msk_gpiote = high_msk        & m_drv_gpio.gpiote.pin_msk;
@@ -155,7 +184,7 @@ static void gpiote_outport_modify(uint32_t high_msk, uint32_t low_msk)
         {
             if ((tmp_u32 & 1) != 0)
             {
-                uint8_t idx = gpiote_idx_get(i);
+                uint8_t idx = gpiote_instance_idx_get(i);
                 
                 if ((high_msk_gpiote & (1UL << i)) != 0)
                 {
@@ -189,9 +218,9 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
     
     if (cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE)
     {
-        if (gpiote_pin_add(pin))
+        if (gpiote_pin_acquire(pin))
         {
-            uint8_t const idx = gpiote_idx_get(pin);
+            uint8_t const idx = gpiote_instance_idx_get(pin);
 
             m_drv_gpio.gpio_states[pin].handler_enable = cfg.handler;
             
@@ -209,7 +238,8 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
                 (cfg.sense                  << GPIOTE_CONFIG_POLARITY_Pos)
             );
 
-            if (p_event != NULL)
+            /* Return the address of the HW event if the storage pointer has been configured. */
+            if (p_event != DRV_GPIO_NO_PARAM_PTR)
             {
                 *p_event = (uint32_t *)&(NRF_GPIOTE->EVENTS_IN[idx]);
             }
@@ -226,7 +256,7 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
     }
     else
     {
-       (void)gpiote_pin_remove(pin);
+       (void)gpiote_pin_release(pin);
         
         m_drv_gpio.gpio_states[pin].current_sense  = cfg.sense;
         m_drv_gpio.gpio_states[pin].handler_enable = cfg.handler;
@@ -242,6 +272,7 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
         {
             uint8_t level;
             
+            /* Read the initial logical level of the pin, or decide depending on the pull-resistor direction. */
             if (cfg.pull == DRV_GPIO_PULL_NONE)
             {
                 drv_gpio_inpin_get(pin, &level);
@@ -251,9 +282,11 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
                 level = (cfg.pull == DRV_GPIO_PULL_UP) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW;
             }
             
+            /* Enable the latch and clear the status. */
             NRF_GPIO->DETECTMODE = GPIO_DETECTMODE_DETECTMODE_LDETECT << GPIO_DETECTMODE_DETECTMODE_Pos;
             NRF_GPIO->LATCH = (1UL << pin);
             
+            /* Configure the sense feature. */
             if (level == DRV_GPIO_LEVEL_LOW)
             {
                 NRF_GPIO->PIN_CNF[pin] |= GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos;
@@ -263,6 +296,7 @@ uint32_t drv_gpio_inpin_cfg(uint8_t pin, drv_gpio_inpin_cfg_t cfg, uint32_t ** p
                 NRF_GPIO->PIN_CNF[pin] |= GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos;
             }
             
+            /* Enable the interrupt if requested. */
             if (cfg.handler == DRV_GPIO_HANDLER_ENABLE)
             {
                 gpiote_intenset(GPIOTE_INTENSET_PORT_Set << GPIOTE_INTENSET_PORT_Pos);
@@ -282,10 +316,12 @@ uint32_t drv_gpio_inpins_cfg(uint32_t pin_msk, drv_gpio_inpin_cfg_t cfg, uint32_
     
     while (tmp_u32 > 0)
     {
+        /* Configure each pin specified by the pin mask. */
         if ((tmp_u32 & 1) != 0)
         {
-            uint32_t ret_val = (p_event_arr == NULL) ? drv_gpio_inpin_cfg(i, cfg, NULL) : drv_gpio_inpin_cfg(i, cfg, &(p_event_arr[n]));
-                
+            uint32_t ret_val = (p_event_arr == DRV_GPIO_NO_PARAM_PTR) ? drv_gpio_inpin_cfg(i, cfg, DRV_GPIO_NO_PARAM_PTR) : drv_gpio_inpin_cfg(i, cfg, &(p_event_arr[n]));
+            
+            /* Abort with error code if configuration fails. */
             if (ret_val != NRF_SUCCESS)
             {
                 return ret_val;
@@ -310,9 +346,9 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
 
     if (cfg.gpiote == DRV_GPIO_GPIOTE_ENABLE)
     {
-        if (gpiote_pin_add(pin))
+        if (gpiote_pin_acquire(pin))
         {
-            uint8_t     const   idx     = gpiote_idx_get(pin);
+            uint8_t     const   idx     = gpiote_instance_idx_get(pin);
             uint32_t            config  = 
             (
                 (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos) |
@@ -320,9 +356,10 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
                 (cfg.level               << GPIOTE_CONFIG_OUTINIT_Pos)
             );
             
-            if (p_task != NULL)
+            /* Return the address of the HW task if the storage pointer has been configured. */
+            if (p_task != DRV_GPIO_NO_PARAM_PTR)
             {
-                uint32_t *p_task_addr;
+                uint32_t *p_task_addr = NULL;
 
                 switch (cfg.task)
                 {
@@ -350,7 +387,7 @@ uint32_t drv_gpio_outpin_cfg(uint8_t pin, drv_gpio_outpin_cfg_t cfg, uint32_t **
     }
     else
     {
-       (void)gpiote_pin_remove(pin);
+       (void)gpiote_pin_release(pin);
         
         NRF_GPIO->PIN_CNF[pin] =
         (
@@ -371,10 +408,12 @@ uint32_t drv_gpio_outpins_cfg(uint32_t pin_msk, drv_gpio_outpin_cfg_t cfg, uint3
     
     while (tmp_u32 > 0)
     {
+        /* Configure each pin specified by the pin mask. */
         if ((tmp_u32 & 1) != 0)
         {
-            uint32_t ret_val = (p_task_arr == NULL) ? drv_gpio_outpin_cfg(i, cfg, NULL) : drv_gpio_outpin_cfg(i, cfg, &(p_task_arr[n]));
-                
+            uint32_t ret_val = (p_task_arr == DRV_GPIO_NO_PARAM_PTR) ? drv_gpio_outpin_cfg(i, cfg, DRV_GPIO_NO_PARAM_PTR) : drv_gpio_outpin_cfg(i, cfg, &(p_task_arr[n]));
+
+            /* Abort with error code if configuration fails. */
             if (ret_val != NRF_SUCCESS)
             {
                 return ret_val;
@@ -397,7 +436,7 @@ uint32_t drv_gpio_pin_disconnect(uint8_t pin)
         return NRF_ERROR_INVALID_PARAM;
     }
     
-   (void)gpiote_pin_remove(pin);
+   (void)gpiote_pin_release(pin);
     
     NRF_GPIO->PIN_CNF[pin] =
     (
@@ -421,6 +460,7 @@ uint32_t drv_gpio_pins_disconnect(uint32_t pin_msk)
     
     while (tmp_u32 > 0)
     {
+        /* Disconnect each pin specified by the pin mask. */
         if ((tmp_u32 & 1) != 0)
         {
             (void)drv_gpio_pin_disconnect(i);
@@ -437,7 +477,7 @@ uint32_t drv_gpio_pins_disconnect(uint32_t pin_msk)
 uint32_t drv_gpio_inpin_get(uint8_t pin, uint8_t *p_level)
 {
     if ((pin     >= DRV_GPIO_NR_OF_PINS)
-    &&  (p_level == NULL))
+    &&  (p_level == DRV_GPIO_NO_PARAM_PTR))
     {
         return NRF_ERROR_INVALID_PARAM;
     }
@@ -468,11 +508,11 @@ uint32_t drv_gpio_outpin_level_set(uint8_t pin, uint8_t level)
     {
         if (level == DRV_GPIO_LEVEL_LOW)
         {
-            gpiote_outport_modify(0, pin_msk);
+            gpiote_outport_modify(M_NO_PIN_MSK, pin_msk);
         }
         else
         {
-            gpiote_outport_modify(pin_msk, 0);
+            gpiote_outport_modify(pin_msk, M_NO_PIN_MSK);
         }
     }
     else
@@ -518,12 +558,13 @@ void drv_gpio_outport_toggle(uint32_t toggle_msk)
         uint32_t set_bits_gpiote = set_bits &  m_drv_gpio.gpiote.pin_msk;
         uint32_t clr_bits_gpiote = clr_bits &  m_drv_gpio.gpiote.pin_msk;
         
-        
+        /* Modify the logical level of the GPIOTE pins if there are any. */
         if ((set_bits_gpiote | clr_bits_gpiote) != 0)
         {
             gpiote_outport_modify(set_bits_gpiote, clr_bits_gpiote);
         }
 
+        /* Modify the logical level of the GPIO pins if there are any. */
         if ((set_bits_gpio | clr_bits_gpio) != 0)
         {
             NRF_GPIO->OUTSET = set_bits_gpio;
@@ -548,8 +589,9 @@ void drv_gpio_outport_set(uint32_t outport)
 
 static void m_pin_event_report(uint8_t pin, uint8_t sense_edge)
 {
+    /* Report event is the handler is available and enabled for the specified pin. */
     if ((m_drv_gpio.gpio_states[pin].handler_enable == DRV_GPIO_HANDLER_ENABLE)
-    &&  (m_drv_gpio.sig_handler                     != NULL))
+    &&  (m_drv_gpio.sig_handler                     != DRV_GPIO_NO_SIG_HANDLER))
     {
         m_drv_gpio.sig_handler(pin, sense_edge);
     }
@@ -560,6 +602,7 @@ void GPIOTE_IRQHandler(void)
 {
     for (uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_GPIOTE_INSTANCES; ++i)
     {
+        /* Handle the event if it is set and the interrupt is enabled. */
         if ((NRF_GPIOTE->EVENTS_IN[i]                                                            != 0) 
         &&  ((NRF_GPIOTE->INTENSET & (GPIOTE_INTENSET_IN0_Set << (GPIOTE_INTENSET_IN0_Pos + i))) != 0))
         {
@@ -577,12 +620,14 @@ void GPIOTE_IRQHandler(void)
     {
         for (uint_fast8_t i = 0; i < DRV_GPIO_NR_OF_PINS; ++i)
         {
+            /* Handle the event if sense is enabled and the latch is set. */
             if ((m_drv_gpio.gpio_states[i].current_sense != DRV_GPIO_SENSE_NONE)
             &&  ((NRF_GPIO->LATCH & (1UL << i))          != 0))
             {
                 uint8_t const sense_level_at_entry = (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_High) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW; 
                 uint8_t const current_pin_sense    = m_drv_gpio.gpio_states[i].current_sense;
                 
+                /* Set the new sense level (rapid changes on the input are filtered out). */
                 do
                 {
                     if (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_Low)
@@ -601,6 +646,7 @@ void GPIOTE_IRQHandler(void)
                 NRF_GPIOTE->EVENTS_PORT = 0;
                (void)NRF_GPIOTE->EVENTS_PORT;
                 
+                /* Report an event if the detected edge is equal to the configured edge. */
                 if (((current_pin_sense == DRV_GPIO_SENSE_LOTOHI) ||
                      (current_pin_sense == DRV_GPIO_SENSE_ANY))
                 &&  (sense_level_at_entry == DRV_GPIO_LEVEL_HIGH))

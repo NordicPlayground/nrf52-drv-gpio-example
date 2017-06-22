@@ -41,7 +41,19 @@
 #include <stdint.h>
 
 
+/**@brief Definition for undefined signal handler. */
+#define DRV_GPIO_NO_SIG_HANDLER         NULL
+
+
+/**@brief Definition of a pointer that does not point to parameters. */
+#define DRV_GPIO_NO_PARAM_PTR           NULL
+
+
+/**@brief The total number of GPIO pins. */
 #define DRV_GPIO_NR_OF_PINS             (32)
+
+
+/**@brief The total number of GPIOTE instances. */
 #define DRV_GPIO_NR_OF_GPIOTE_INSTANCES (8)
 
 

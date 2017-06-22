@@ -44,8 +44,10 @@
 #error "ERROR: This example is only for NRF52."
 #endif
 
-#define M_BUTTONS_MSK   ((1UL << BUTTON_1) | (1UL << BUTTON_2) | (1UL << BUTTON_3) | (1UL << BUTTON_4))
-#define M_LEDS_MSK      ((1UL << LED_1)    | (1UL << LED_2)    | (1UL << LED_3)    | (1UL << LED_4))
+
+#define M_NO_PIN_MSK        (0)
+#define M_BUTTON_PINS_MSK   ((1UL << BUTTON_1) | (1UL << BUTTON_2) | (1UL << BUTTON_3) | (1UL << BUTTON_4))
+#define M_LED_PINS_MSK      ((1UL << LED_1)    | (1UL << LED_2)    | (1UL << LED_3)    | (1UL << LED_4))
 
 
 /*
@@ -55,23 +57,23 @@ static void m_example_start_indicate(void)
 {
     drv_gpio_outpin_cfg_t out_cfg = DRV_GPIO_OUTPIN_CFG_DEFAULT;
 
-    drv_gpio_outpins_cfg(M_LEDS_MSK, out_cfg, NULL);
+    drv_gpio_outpins_cfg(M_LED_PINS_MSK, out_cfg, DRV_GPIO_NO_PARAM_PTR);
     
     for (uint_fast8_t n = 0; n < 4; ++n)
     {
         nrf_delay_ms(250);
-        drv_gpio_outport_modify(M_LEDS_MSK, 0);
+        drv_gpio_outport_modify(M_LED_PINS_MSK, M_NO_PIN_MSK);
         nrf_delay_ms(250);
-        drv_gpio_outport_modify(0, M_LEDS_MSK);
+        drv_gpio_outport_modify(M_NO_PIN_MSK, M_LED_PINS_MSK);
     }
     
-    drv_gpio_pins_disconnect(M_LEDS_MSK);
+    drv_gpio_pins_disconnect(M_LED_PINS_MSK);
 }
 
 
 /*
     m_drv_gpio_pin_cfg_example shows:
-        - Configurations of pins groups.
+        - Configuration of individual pins.
         - Getting the level of single pins.
         - Setting the level of single pins.
         - Disconnecting single pins.
@@ -92,15 +94,15 @@ static void m_drv_gpio_pin_cfg_example(void)
        there are no external pullup resistors on the nRF52 development board. */
     in_cfg.pull = DRV_GPIO_PULL_UP;
 
-    drv_gpio_outpin_cfg(LED_1, out_cfg, NULL);
-    drv_gpio_outpin_cfg(LED_2, out_cfg, NULL);
-    drv_gpio_outpin_cfg(LED_3, out_cfg, NULL);
-    drv_gpio_outpin_cfg(LED_4, out_cfg, NULL);
+    drv_gpio_outpin_cfg(LED_1, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_outpin_cfg(LED_2, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_outpin_cfg(LED_3, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_outpin_cfg(LED_4, out_cfg, DRV_GPIO_NO_PARAM_PTR);
     
-    drv_gpio_inpin_cfg(BUTTON_1, in_cfg, NULL);
-    drv_gpio_inpin_cfg(BUTTON_2, in_cfg, NULL);
-    drv_gpio_inpin_cfg(BUTTON_3, in_cfg, NULL);
-    drv_gpio_inpin_cfg(BUTTON_4, in_cfg, NULL);
+    drv_gpio_inpin_cfg(BUTTON_1, in_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpin_cfg(BUTTON_2, in_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpin_cfg(BUTTON_3, in_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpin_cfg(BUTTON_4, in_cfg, DRV_GPIO_NO_PARAM_PTR);
     
     do
     { 
@@ -121,8 +123,8 @@ static void m_drv_gpio_pin_cfg_example(void)
             }
         }
     }
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != 0);
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != M_BUTTONS_MSK);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != 0);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != M_BUTTON_PINS_MSK);
     
     for (uint_fast8_t i = 0; i < MAPPING_SIZE; ++i)
     {
@@ -134,7 +136,7 @@ static void m_drv_gpio_pin_cfg_example(void)
 
 /*
     m_drv_gpio_pins_cfg_example shows:
-        - Configurations of pins groups.
+        - Configuration of groups of pins.
         - Getting the level of a group of pins.
         - Setting the level of a group of pins.
         - Disconnecting a group of pins.
@@ -153,8 +155,8 @@ static void m_drv_gpio_pins_cfg_example(void)
        there are no external pullup resistors on the nRF52 development board. */
     in_cfg.pull = DRV_GPIO_PULL_UP;
 
-    drv_gpio_outpins_cfg(M_LEDS_MSK, out_cfg, NULL);
-    drv_gpio_inpins_cfg(M_BUTTONS_MSK, in_cfg, NULL);
+    drv_gpio_outpins_cfg(M_LED_PINS_MSK, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpins_cfg(M_BUTTON_PINS_MSK, in_cfg, DRV_GPIO_NO_PARAM_PTR);
     
     do
     { 
@@ -162,16 +164,16 @@ static void m_drv_gpio_pins_cfg_example(void)
         
         drv_gpio_outport_set((inport >> BUTTON_1) << LED_1);
     }
-    while ((inport & M_BUTTONS_MSK)                != 0);
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != M_BUTTONS_MSK);
+    while ((inport & M_BUTTON_PINS_MSK)                != 0);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != M_BUTTON_PINS_MSK);
     
-    drv_gpio_pins_disconnect(M_BUTTONS_MSK | M_LEDS_MSK);
+    drv_gpio_pins_disconnect(M_BUTTON_PINS_MSK | M_LED_PINS_MSK);
 }
 
 
 /*
     m_drv_gpio_toggle_example shows:
-        - Configurations of pins groups.
+        - Configuration of groups of pins.
         - Getting the level of a group of pins.
         - Sensing a group of pins using interrupts and the low-power PORT-event.
         - Setting the level of single pins.
@@ -213,23 +215,23 @@ static void m_drv_gpio_toggle_example(void)
     /* Indicate the start of the example. */
     m_example_start_indicate();
  
-    drv_gpio_outpins_cfg(M_LEDS_MSK, out_cfg, NULL);
-    drv_gpio_inpins_cfg(M_BUTTONS_MSK, in_cfg, NULL);
+    drv_gpio_outpins_cfg(M_LED_PINS_MSK, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpins_cfg(M_BUTTON_PINS_MSK, in_cfg, DRV_GPIO_NO_PARAM_PTR);
     
     drv_gpio_sig_handler_set(m_drv_gpio_toggle_example_sig_handler);
     
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != 0);
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != M_BUTTONS_MSK);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != 0);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != M_BUTTON_PINS_MSK);
 
-    drv_gpio_pins_disconnect(M_BUTTONS_MSK | M_LEDS_MSK);
+    drv_gpio_pins_disconnect(M_BUTTON_PINS_MSK | M_LED_PINS_MSK);
     
-    drv_gpio_sig_handler_set(NULL);
+    drv_gpio_sig_handler_set(DRV_GPIO_NO_SIG_HANDLER);
 }
 
 
 /*
     m_drv_gpio_toggle_hw_example shows:
-        - Configurations of pins groups.
+        - Configuration of groups of pins.
         - Getting the level of a group of pins.
         - Toggling of sensing of inputs and toggling of outputs without firmware interraction.
         - Disconnecting a group of pins.
@@ -256,8 +258,8 @@ static void m_drv_gpio_toggle_hw_example(void)
     /* Indicate the start of the example. */
     m_example_start_indicate();
  
-    drv_gpio_outpins_cfg(M_LEDS_MSK, out_cfg, &(tasks[0]));
-    drv_gpio_inpins_cfg(M_BUTTONS_MSK, in_cfg, &(events[0]));
+    drv_gpio_outpins_cfg(M_LED_PINS_MSK, out_cfg, &(tasks[0]));
+    drv_gpio_inpins_cfg(M_BUTTON_PINS_MSK, in_cfg, &(events[0]));
     
     for (uint_fast8_t i = 0; i < 4; ++i)
     {
@@ -267,21 +269,21 @@ static void m_drv_gpio_toggle_hw_example(void)
         NRF_PPI->CHENSET = 1UL << i;
     }        
     
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != 0);
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != M_BUTTONS_MSK);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != 0);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != M_BUTTON_PINS_MSK);
 
     for (uint_fast8_t i = 0; i < 4; ++i)
     {
         NRF_PPI->CHENCLR = 1UL << i;
     }        
 
-    drv_gpio_pins_disconnect(M_BUTTONS_MSK | M_LEDS_MSK);
+    drv_gpio_pins_disconnect(M_BUTTON_PINS_MSK | M_LED_PINS_MSK);
 }
 
 
 /*
     m_drv_gpio_select_example shows:
-        - Configurations of pins groups.
+        - Configuration of groups of pins.
         - Sensing a group of pins using interrupts and GPIOTE IN-event.
         - Interrupt on falling edge for a group of pins.
         - Toggling output pins on interrupt.
@@ -321,17 +323,17 @@ static void m_drv_gpio_select_example(void)
     /* Indicate the start of the example. */
     m_example_start_indicate();
  
-    drv_gpio_outpins_cfg(M_LEDS_MSK, out_cfg, NULL);
-    drv_gpio_inpins_cfg(M_BUTTONS_MSK, in_cfg, NULL);
+    drv_gpio_outpins_cfg(M_LED_PINS_MSK, out_cfg, DRV_GPIO_NO_PARAM_PTR);
+    drv_gpio_inpins_cfg(M_BUTTON_PINS_MSK, in_cfg, DRV_GPIO_NO_PARAM_PTR);
     
     drv_gpio_sig_handler_set(m_drv_gpio_select_example_sig_handler);
     
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != 0);
-    while ((drv_gpio_inport_get() & M_BUTTONS_MSK) != M_BUTTONS_MSK);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != 0);
+    while ((drv_gpio_inport_get() & M_BUTTON_PINS_MSK) != M_BUTTON_PINS_MSK);
 
-    drv_gpio_pins_disconnect(M_BUTTONS_MSK | M_LEDS_MSK);
+    drv_gpio_pins_disconnect(M_BUTTON_PINS_MSK | M_LED_PINS_MSK);
     
-    drv_gpio_sig_handler_set(NULL);
+    drv_gpio_sig_handler_set(DRV_GPIO_NO_SIG_HANDLER);
 }
 
 
