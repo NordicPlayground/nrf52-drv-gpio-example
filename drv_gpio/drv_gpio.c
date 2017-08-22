@@ -626,20 +626,27 @@ void GPIOTE_IRQHandler(void)
             {
                 uint8_t const sense_level_at_entry = (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_High) ? DRV_GPIO_LEVEL_HIGH : DRV_GPIO_LEVEL_LOW; 
                 uint8_t const current_pin_sense    = m_drv_gpio.gpio_states[i].current_sense;
+                uint32_t pin_cnf;
                 
                 /* Set the new sense level (rapid changes on the input are filtered out). */
                 do
                 {
-                    if (((NRF_GPIO->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_Low)
+                    pin_cnf = NRF_GPIO->PIN_CNF[i];
+                    NRF_GPIO->PIN_CNF[i] = (pin_cnf & ~GPIO_PIN_CNF_SENSE_Msk) 
+                                         | (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos);
+                    if ( ((pin_cnf & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos) == GPIO_PIN_CNF_SENSE_Low )
                     {
-                        NRF_GPIO->PIN_CNF[i] = (NRF_GPIO->PIN_CNF[i] & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+                        pin_cnf = (pin_cnf & ~GPIO_PIN_CNF_SENSE_Msk) 
+                                | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
                     }
                     else
                     {
-                        NRF_GPIO->PIN_CNF[i] = (NRF_GPIO->PIN_CNF[i] & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+                        pin_cnf = (pin_cnf & ~GPIO_PIN_CNF_SENSE_Msk) 
+                                | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
                     }
                     NRF_GPIO->LATCH = 1UL << i;
-                    (void)NRF_GPIO->LATCH;
+                    while ( (NRF_GPIO->LATCH & (1UL << i)) != 0 );
+                    NRF_GPIO->PIN_CNF[i] = pin_cnf;
                 }
                 while ((NRF_GPIO->LATCH & (1UL << i)) != 0);
              
