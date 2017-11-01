@@ -18,7 +18,7 @@ Follow these steps to run the example:
 
 . Extract the 12.3.0 version of the SDK.
 . Enter the nRF5_SDK_12.3.0_d7731ad\examples\peripheral directory.
-. Clone the repo: git clone https://github.com/NordicSemiconductor/nrf52-drv-gpio-example.git
+. Clone the repo: git clone https://github.com/NordicPlayground/nrf52-drv-gpio-example.git
 . Enter the nRF5_SDK_12.3.0_d7731ad\examples\peripheral\nrf52-drv-gpio-example\pca10040\arm5_no_packs directory
 . Open the drv_gpio_example.uvprojx Keil project file.
 . Build the project.
